@@ -1,0 +1,20 @@
+[package]
+name = "nu_plugin_tracer"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "A wrapper to trace Nu plugins"
+homepage = "https://github.com/tesujimath/nu_plugin_tracer"
+repository = "https://github.com/tesujimath/nu_plugin_tracer"
+readme = "README.md"
+
+[dependencies]
+# TODO don't need full tokio
+tokio = { version = "1.37.0", features = ["full"] }
+pin-project = "1.1.5"
+anyhow = "1.0.82"
+nu-path = "0.92.2"
+tracing = "0.1.40"
+tracing-appender = "0.2.3"
+tracing-subscriber = "0.3.18"
+home = "0.5.9"
