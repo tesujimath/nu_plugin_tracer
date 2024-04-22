@@ -61,13 +61,15 @@ where
     Ok(())
 }
 
-#[tokio::main(flavor = "current_thread")]
-async fn main() -> anyhow::Result<()> {
+// the reason this isn't in main is so that `_guard` gets dropped (causing tracing output to be flushed) before `exit()`
+async fn trace() -> anyhow::Result<()> {
     let home = home_dir().ok_or(anyhow!("can't determine user home directory"))?;
     let appender = tracing_appender::rolling::never(home, "nu_plugin_tracer.log");
     let (non_blocking_appender, _guard) = tracing_appender::non_blocking(appender);
-    let subscriber = tracing_subscriber::fmt().with_writer(non_blocking_appender);
-    tracing::subscriber::set_global_default(subscriber.finish())?;
+    let subscriber = tracing_subscriber::fmt()
+        .with_writer(non_blocking_appender)
+        .finish();
+    tracing::subscriber::set_global_default(subscriber)?;
 
     let tracer_name = program_name()?;
     let suffix = "_tracer";
@@ -121,5 +123,14 @@ async fn main() -> anyhow::Result<()> {
     );
 
     tracing::info!("tracer is done");
+
     Ok(())
+}
+
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> anyhow::Result<()> {
+    trace().await?;
+
+    // TODO why is this needed to finish?
+    std::process::exit(0);
 }
