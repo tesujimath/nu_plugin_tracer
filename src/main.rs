@@ -1,5 +1,4 @@
 use anyhow::{anyhow, Result};
-use home::home_dir;
 use std::{
     env::args_os,
     path::{Path, PathBuf},
@@ -13,7 +12,6 @@ use tokio::{
     pin,
     process::Command,
 };
-use tracing_subscriber::layer::SubscriberExt;
 
 fn program_name() -> Result<String> {
     args_os()
@@ -64,13 +62,6 @@ where
 }
 
 async fn trace_plugin() -> anyhow::Result<()> {
-    let home = home_dir().ok_or(anyhow!("can't determine user home directory"))?;
-    let appender = tracing_appender::rolling::never(home, "nu_plugin_tracer.log");
-    let (non_blocking_appender, _guard) = tracing_appender::non_blocking(appender);
-    let file_layer = tracing_subscriber::fmt::layer().with_writer(non_blocking_appender);
-    let subscriber = tracing_subscriber::Registry::default().with(file_layer);
-    tracing::subscriber::set_global_default(subscriber)?;
-
     let tracer_name = program_name()?;
     let suffix = "_tracer";
 
@@ -86,8 +77,6 @@ async fn trace_plugin() -> anyhow::Result<()> {
         .spawn()?;
     let (plugin_stdin, plugin_stdout) =
         (plugin.stdin.take().unwrap(), plugin.stdout.take().unwrap());
-
-    tracing::info!("tracing {:?}", &plugin_path);
 
     let raw_in_path = PathBuf::from(format!("{}.in.raw", &plugin_name));
     let raw_in = OpenOptions::new()
@@ -111,18 +100,10 @@ async fn trace_plugin() -> anyhow::Result<()> {
     pin!(plugin_stdin);
     pin!(plugin_stdout);
     tokio::select!(
-        _ = forward(stdin, plugin_stdin, raw_in) => {
-            tracing::info!("in tee is done");
-        },
-        _ = forward(plugin_stdout, stdout, raw_out) => {
-            tracing::info!("out tee is done");
-        },
-        _ = plugin.wait() => {
-            tracing::info!("plugin is done");
-        }
+        _ = forward(stdin, plugin_stdin, raw_in) => { },
+        _ = forward(plugin_stdout, stdout, raw_out) => { },
+        _ = plugin.wait() => { }
     );
-
-    tracing::info!("tracer is done");
 
     Ok(())
 }
