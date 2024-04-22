@@ -1,4 +1,0 @@
-[build]
-# for tokio-console, see https://github.com/tokio-rs/console
-rustflags = ["--cfg", "tokio_unstable"]
-

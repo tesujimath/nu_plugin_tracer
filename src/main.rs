@@ -1,9 +1,7 @@
 use anyhow::{anyhow, Result};
-use console_subscriber::{ConsoleLayer, ServerAddr};
 use home::home_dir;
 use std::{
     env::args_os,
-    net::SocketAddrV4,
     path::{Path, PathBuf},
     pin::Pin,
     process::Stdio,
@@ -66,19 +64,11 @@ where
 }
 
 async fn trace_plugin() -> anyhow::Result<()> {
-    let console_layer = ConsoleLayer::builder()
-        .server_addr(std::convert::Into::<ServerAddr>::into(
-            "127.0.0.1:6669".parse::<SocketAddrV4>().unwrap(),
-        ))
-        .retention(Duration::from_secs(30))
-        .spawn();
     let home = home_dir().ok_or(anyhow!("can't determine user home directory"))?;
     let appender = tracing_appender::rolling::never(home, "nu_plugin_tracer.log");
     let (non_blocking_appender, _guard) = tracing_appender::non_blocking(appender);
     let file_layer = tracing_subscriber::fmt::layer().with_writer(non_blocking_appender);
-    let subscriber = tracing_subscriber::Registry::default()
-        .with(console_layer)
-        .with(file_layer);
+    let subscriber = tracing_subscriber::Registry::default().with(file_layer);
     tracing::subscriber::set_global_default(subscriber)?;
 
     let tracer_name = program_name()?;
