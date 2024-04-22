@@ -65,9 +65,7 @@ where
     Ok(())
 }
 
-// TODO the reason this isn't in main is so that `_guard` gets dropped (causing tracing output to be flushed) before `exit()`,
-// but once exiting is fixed this shouldn't be needed
-async fn trace() -> anyhow::Result<()> {
+async fn trace_plugin() -> anyhow::Result<()> {
     let console_layer = ConsoleLayer::builder()
         .server_addr(std::convert::Into::<ServerAddr>::into(
             "127.0.0.1:6669".parse::<SocketAddrV4>().unwrap(),
@@ -139,12 +137,17 @@ async fn trace() -> anyhow::Result<()> {
     Ok(())
 }
 
-#[tokio::main(flavor = "current_thread")]
-async fn main() -> anyhow::Result<()> {
-    trace().await?;
+fn main() -> anyhow::Result<()> {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
 
-    // TODO why is this needed to finish? - debug with tokio-console
-    // std::process::exit(0);
+    let result = runtime.block_on(trace_plugin());
 
-    Ok(())
+    // https://github.com/tokio-rs/tokio/issues/2466
+    // https://github.com/tokio-rs/tokio/issues/2318#issuecomment-599651871
+    runtime.shutdown_timeout(Duration::from_secs(0));
+
+    result
 }
