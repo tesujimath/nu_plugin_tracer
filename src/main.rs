@@ -1,10 +1,13 @@
 use anyhow::{anyhow, Result};
+use console_subscriber::{ConsoleLayer, ServerAddr};
 use home::home_dir;
 use std::{
     env::args_os,
+    net::SocketAddrV4,
     path::{Path, PathBuf},
     pin::Pin,
     process::Stdio,
+    time::Duration,
 };
 use tokio::{
     fs::OpenOptions,
@@ -12,6 +15,7 @@ use tokio::{
     pin,
     process::Command,
 };
+use tracing_subscriber::layer::SubscriberExt;
 
 fn program_name() -> Result<String> {
     args_os()
@@ -61,14 +65,22 @@ where
     Ok(())
 }
 
-// the reason this isn't in main is so that `_guard` gets dropped (causing tracing output to be flushed) before `exit()`
+// TODO the reason this isn't in main is so that `_guard` gets dropped (causing tracing output to be flushed) before `exit()`,
+// but once exiting is fixed this shouldn't be needed
 async fn trace() -> anyhow::Result<()> {
+    let console_layer = ConsoleLayer::builder()
+        .server_addr(std::convert::Into::<ServerAddr>::into(
+            "127.0.0.1:6669".parse::<SocketAddrV4>().unwrap(),
+        ))
+        .retention(Duration::from_secs(30))
+        .spawn();
     let home = home_dir().ok_or(anyhow!("can't determine user home directory"))?;
     let appender = tracing_appender::rolling::never(home, "nu_plugin_tracer.log");
     let (non_blocking_appender, _guard) = tracing_appender::non_blocking(appender);
-    let subscriber = tracing_subscriber::fmt()
-        .with_writer(non_blocking_appender)
-        .finish();
+    let file_layer = tracing_subscriber::fmt::layer().with_writer(non_blocking_appender);
+    let subscriber = tracing_subscriber::Registry::default()
+        .with(console_layer)
+        .with(file_layer);
     tracing::subscriber::set_global_default(subscriber)?;
 
     let tracer_name = program_name()?;
@@ -131,6 +143,8 @@ async fn trace() -> anyhow::Result<()> {
 async fn main() -> anyhow::Result<()> {
     trace().await?;
 
-    // TODO why is this needed to finish?
-    std::process::exit(0);
+    // TODO why is this needed to finish? - debug with tokio-console
+    // std::process::exit(0);
+
+    Ok(())
 }

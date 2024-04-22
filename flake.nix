@@ -31,6 +31,7 @@
                 cargo-udeps
                 cargo-outdated
                 rust-bin.stable.latest.default
+                tokio-console
               ];
             };
           }
