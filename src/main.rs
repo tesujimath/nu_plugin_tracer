@@ -1,11 +1,5 @@
-use anyhow::{anyhow, Result};
-use std::{
-    env::args_os,
-    path::{Path, PathBuf},
-    pin::Pin,
-    process::Stdio,
-    time::Duration,
-};
+use anyhow::{anyhow, Context, Result};
+use std::{env::args_os, path::PathBuf, pin::Pin, process::Stdio, time::Duration};
 use tokio::{
     fs::{File, OpenOptions},
     io::{stdin, stdout, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
@@ -13,18 +7,20 @@ use tokio::{
     process::Command,
 };
 
-fn program_name() -> Result<String> {
-    args_os()
+fn tracer_program() -> Result<(String, PathBuf)> {
+    let path: PathBuf = args_os()
         .next()
-        .ok_or(anyhow!("can't find own program name"))
-        .and_then(|s| {
-            Ok(Path::new(&s)
-                .file_name()
-                .ok_or(anyhow!("failed to determine file_name for program"))?
-                .to_str()
-                .ok_or(anyhow!("program name is not valid unicode"))?
-                .to_string())
-        })
+        .ok_or(anyhow!("can't find own program name"))?
+        .into();
+
+    let name = path
+        .file_name()
+        .ok_or(anyhow!("failed to determine file_name for program"))?
+        .to_str()
+        .ok_or(anyhow!("program name is not valid unicode"))?
+        .to_string();
+
+    Ok((name, path))
 }
 
 fn default_plugins_dir() -> Result<PathBuf> {
@@ -72,7 +68,7 @@ async fn open_trace_file(plugin_name: &str, suffix: &str) -> anyhow::Result<File
 }
 
 async fn trace_plugin() -> anyhow::Result<()> {
-    let tracer_name = program_name()?;
+    let (tracer_name, tracer_path) = tracer_program()?;
     let tracer_suffix = "_tracer";
 
     let plugin_name = tracer_name
@@ -89,7 +85,15 @@ async fn trace_plugin() -> anyhow::Result<()> {
         .args(std::env::args().skip(1))
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .spawn()?;
+        .spawn()
+        .with_context(|| {
+            format!(
+                "can't execute wrapped plugin {} (plugin name inferred from {})",
+                &plugin_path.to_string_lossy(),
+                &tracer_path.to_string_lossy()
+            )
+        })?;
+
     let (plugin_stdin, plugin_stdout) =
         (plugin.stdin.take().unwrap(), plugin.stdout.take().unwrap());
     pin!(plugin_stdin);
