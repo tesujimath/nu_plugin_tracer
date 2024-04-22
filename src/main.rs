@@ -7,7 +7,7 @@ use std::{
     time::Duration,
 };
 use tokio::{
-    fs::OpenOptions,
+    fs::{File, OpenOptions},
     io::{stdin, stdout, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
     pin,
     process::Command,
@@ -28,7 +28,7 @@ fn program_name() -> Result<String> {
 }
 
 fn default_plugins_dir() -> Result<PathBuf> {
-    let config_dir: PathBuf = nu_path::config_dir().ok_or(anyhow!("can't find Nu config dir"))?;
+    let config_dir: PathBuf = nu_path::config_dir().ok_or(anyhow!("can't find user config dir"))?;
 
     Ok(config_dir.join("nushell").join("plugins"))
 }
@@ -61,14 +61,29 @@ where
     Ok(())
 }
 
+async fn open_trace_file(plugin_name: &str, suffix: &str) -> anyhow::Result<File> {
+    let path = PathBuf::from(format!("{}{}", plugin_name, suffix));
+    let f = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+        .await?;
+    Ok(f)
+}
+
 async fn trace_plugin() -> anyhow::Result<()> {
     let tracer_name = program_name()?;
-    let suffix = "_tracer";
+    let tracer_suffix = "_tracer";
 
     let plugin_name = tracer_name
         .strip_suffix("_tracer")
-        .ok_or(anyhow!("program name doesn't end with {}", suffix))?;
+        .ok_or(anyhow!("program name doesn't end with {}", tracer_suffix))?;
     let plugin_path = default_plugins_dir().map(|p| p.join(plugin_name))?;
+
+    let stdin = stdin();
+    let stdout = stdout();
+    pin!(stdin);
+    pin!(stdout);
 
     let mut plugin = Command::new(&plugin_path)
         .args(std::env::args().skip(1))
@@ -77,28 +92,15 @@ async fn trace_plugin() -> anyhow::Result<()> {
         .spawn()?;
     let (plugin_stdin, plugin_stdout) =
         (plugin.stdin.take().unwrap(), plugin.stdout.take().unwrap());
-
-    let raw_in_path = PathBuf::from(format!("{}.in.raw", &plugin_name));
-    let raw_in = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&raw_in_path)
-        .await?;
-    pin!(raw_in);
-    let raw_out_path = PathBuf::from(format!("{}.out.raw", &plugin_name));
-    let raw_out = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&raw_out_path)
-        .await?;
-    pin!(raw_out);
-
-    let stdin = stdin();
-    let stdout = stdout();
-    pin!(stdin);
-    pin!(stdout);
     pin!(plugin_stdin);
     pin!(plugin_stdout);
+
+    let raw_in = open_trace_file(plugin_name, ".in.raw").await?;
+    pin!(raw_in);
+
+    let raw_out = open_trace_file(plugin_name, ".out.raw").await?;
+    pin!(raw_out);
+
     tokio::select!(
         _ = forward(stdin, plugin_stdin, raw_in) => { },
         _ = forward(plugin_stdout, stdout, raw_out) => { },
