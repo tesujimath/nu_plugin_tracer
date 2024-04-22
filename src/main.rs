@@ -34,7 +34,6 @@ fn default_plugins_dir() -> Result<PathBuf> {
 }
 
 async fn forward<R, W, Tee>(
-    label: &str,
     mut r: Pin<&mut R>,
     mut w: Pin<&mut W>,
     mut tee: Pin<&mut Tee>,
@@ -48,7 +47,6 @@ where
     let mut buf: [u8; 1024] = [0; 1024];
 
     while !done {
-        tracing::info!("{} attempt read", label);
         let n_read = r.read(&mut buf).await?;
         if n_read == 0 {
             done = true;
@@ -58,9 +56,7 @@ where
             tee.write_all(&buf[..n_read]).await?;
             tee.flush().await?;
         }
-        tracing::info!("{} forward {} bytes", label, n_read);
     }
-    tracing::info!("{} done", label);
 
     Ok(())
 }
@@ -112,13 +108,18 @@ async fn main() -> anyhow::Result<()> {
     pin!(stdout);
     pin!(plugin_stdin);
     pin!(plugin_stdout);
-    let res = tokio::try_join!(
-        forward("in", stdin, plugin_stdin, raw_in),
-        forward("out", plugin_stdout, stdout, raw_out),
-        plugin.wait()
+    tokio::select!(
+        _ = forward(stdin, plugin_stdin, raw_in) => {
+            tracing::info!("in tee is done");
+        },
+        _ = forward(plugin_stdout, stdout, raw_out) => {
+            tracing::info!("out tee is done");
+        },
+        _ = plugin.wait() => {
+            tracing::info!("plugin is done");
+        }
     );
 
     tracing::info!("tracer is done");
-
-    res.map(|_| ()).map_err(|e| e.into())
+    Ok(())
 }
