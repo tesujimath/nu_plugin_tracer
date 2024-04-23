@@ -2,6 +2,8 @@
 
 This is a diagnostic wrapper for [Nu plugins](https://www.nushell.sh/book/plugins.html) which dumps the raw plugin stdin and stdout into files in the current directory.
 
+This is probably only useful for people writing plugins in languages other than Rust.
+
 ## Usage
 
 The program needs to be installed somewhere on the Nu plugin path, with a name corresponding to the plugin desiring to be wrapped.  It is insufficient for this to be a symlink, because Nu canonicalizes paths, resulting in the tracer program not being able to determine its name as invoked as a plugin.
