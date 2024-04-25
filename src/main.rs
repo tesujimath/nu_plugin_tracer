@@ -1,5 +1,12 @@
 use anyhow::{anyhow, Context, Result};
-use std::{env::args_os, path::PathBuf, pin::Pin, process::Stdio, time::Duration};
+use std::{
+    env::{args_os, ArgsOs},
+    ffi::{OsStr, OsString},
+    path::PathBuf,
+    pin::Pin,
+    process::Stdio,
+    time::Duration,
+};
 use tokio::{
     fs::{File, OpenOptions},
     io::{stdin, stdout, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
@@ -7,26 +14,16 @@ use tokio::{
     process::Command,
 };
 
-fn tracer_program() -> Result<(String, PathBuf)> {
-    let path: PathBuf = args_os()
-        .next()
-        .ok_or(anyhow!("can't find own program name"))?
-        .into();
+fn get_plugin_from_args() -> Result<(OsString, PathBuf, ArgsOs)> {
+    let mut args = args_os();
+    let path: PathBuf = args.nth(1).ok_or(anyhow!("missing plugin path"))?.into();
 
     let name = path
         .file_name()
-        .ok_or(anyhow!("failed to determine file_name for program"))?
-        .to_str()
-        .ok_or(anyhow!("program name is not valid unicode"))?
-        .to_string();
+        .ok_or(anyhow!("failed to determine file name for plugin"))?
+        .to_os_string();
 
-    Ok((name, path))
-}
-
-fn default_plugins_dir() -> Result<PathBuf> {
-    let config_dir: PathBuf = nu_path::config_dir().ok_or(anyhow!("can't find user config dir"))?;
-
-    Ok(config_dir.join("nushell").join("plugins"))
+    Ok((name, path, args))
 }
 
 async fn forward<R, W, Tee>(
@@ -57,8 +54,13 @@ where
     Ok(())
 }
 
-async fn open_trace_file(plugin_name: &str, suffix: &str) -> anyhow::Result<File> {
-    let path = PathBuf::from(format!("{}{}", plugin_name, suffix));
+async fn open_trace_file<S>(plugin_name: S, suffix: &str) -> anyhow::Result<File>
+where
+    S: AsRef<OsStr>,
+{
+    let mut suffixed_name = plugin_name.as_ref().to_os_string();
+    suffixed_name.push(suffix);
+    let path = PathBuf::from(suffixed_name);
     let f = OpenOptions::new()
         .create(true)
         .append(true)
@@ -68,13 +70,7 @@ async fn open_trace_file(plugin_name: &str, suffix: &str) -> anyhow::Result<File
 }
 
 async fn trace_plugin() -> anyhow::Result<()> {
-    let (tracer_name, tracer_path) = tracer_program()?;
-    let tracer_suffix = "_tracer";
-
-    let plugin_name = tracer_name
-        .strip_suffix("_tracer")
-        .ok_or(anyhow!("program name doesn't end with {}", tracer_suffix))?;
-    let plugin_path = default_plugins_dir().map(|p| p.join(plugin_name))?;
+    let (plugin_name, plugin_path, plugin_args) = get_plugin_from_args()?;
 
     let stdin = stdin();
     let stdout = stdout();
@@ -82,15 +78,14 @@ async fn trace_plugin() -> anyhow::Result<()> {
     pin!(stdout);
 
     let mut plugin = Command::new(&plugin_path)
-        .args(std::env::args().skip(1))
+        .args(plugin_args)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
         .with_context(|| {
             format!(
-                "can't execute wrapped plugin {} (plugin name inferred from {})",
+                "can't execute wrapped plugin {}",
                 &plugin_path.to_string_lossy(),
-                &tracer_path.to_string_lossy()
             )
         })?;
 
@@ -99,16 +94,19 @@ async fn trace_plugin() -> anyhow::Result<()> {
     pin!(plugin_stdin);
     pin!(plugin_stdout);
 
-    let raw_in = open_trace_file(plugin_name, ".in.raw").await?;
+    let raw_in = open_trace_file(&plugin_name, ".in.raw").await?;
     pin!(raw_in);
 
-    let raw_out = open_trace_file(plugin_name, ".out.raw").await?;
+    let raw_out = open_trace_file(&plugin_name, ".out.raw").await?;
     pin!(raw_out);
 
     tokio::select!(
-        _ = forward(stdin, plugin_stdin, raw_in) => { },
-        _ = forward(plugin_stdout, stdout, raw_out) => { },
-        _ = plugin.wait() => { }
+        _ = forward(stdin, plugin_stdin, raw_in) => {
+        },
+        _ = forward(plugin_stdout, stdout, raw_out) => {
+        },
+        _ = plugin.wait() => {
+        }
     );
 
     Ok(())
