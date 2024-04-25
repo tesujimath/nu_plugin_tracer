@@ -1,8 +1,9 @@
 use anyhow::{anyhow, Context, Result};
+use home::home_dir;
 use std::{
     env::{args_os, ArgsOs},
     ffi::{OsStr, OsString},
-    path::PathBuf,
+    path::{Path, PathBuf},
     pin::Pin,
     process::Stdio,
     time::Duration,
@@ -54,13 +55,14 @@ where
     Ok(())
 }
 
-async fn open_trace_file<S>(plugin_name: S, suffix: &str) -> anyhow::Result<File>
+async fn open_trace_file<P, S>(home: P, plugin_name: S, suffix: &str) -> anyhow::Result<File>
 where
+    P: AsRef<Path>,
     S: AsRef<OsStr>,
 {
     let mut suffixed_name = plugin_name.as_ref().to_os_string();
     suffixed_name.push(suffix);
-    let path = PathBuf::from(suffixed_name);
+    let path = home.as_ref().join(suffixed_name);
     let f = OpenOptions::new()
         .create(true)
         .append(true)
@@ -70,6 +72,7 @@ where
 }
 
 async fn trace_plugin() -> anyhow::Result<()> {
+    let home = home_dir().ok_or(anyhow!("can't determine user home directory"))?;
     let (plugin_name, plugin_path, plugin_args) = get_plugin_from_args()?;
 
     let stdin = stdin();
@@ -94,10 +97,10 @@ async fn trace_plugin() -> anyhow::Result<()> {
     pin!(plugin_stdin);
     pin!(plugin_stdout);
 
-    let raw_in = open_trace_file(&plugin_name, ".in.raw").await?;
+    let raw_in = open_trace_file(&home, &plugin_name, ".in.raw").await?;
     pin!(raw_in);
 
-    let raw_out = open_trace_file(&plugin_name, ".out.raw").await?;
+    let raw_out = open_trace_file(&home, &plugin_name, ".out.raw").await?;
     pin!(raw_out);
 
     tokio::select!(

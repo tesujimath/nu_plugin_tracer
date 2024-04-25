@@ -1,6 +1,6 @@
 # nu_plugin_tracer
 
-This is a diagnostic wrapper for [Nu plugins](https://www.nushell.sh/book/plugins.html) which dumps the raw plugin stdin and stdout into files in the current directory.
+This is a diagnostic wrapper for [Nu plugins](https://www.nushell.sh/book/plugins.html) which dumps the raw plugin stdin and stdout into files in the user's home directory.
 
 This is probably only useful for people writing plugins in languages other than Rust.
 
@@ -17,8 +17,7 @@ Add the plugin using the tracer as a shell interpreter, using the full paths of 
 > plugin use bash_env
 ```
 
-The output appears in files named after the plugin, in the current directory.
-Note that Nu runs plugins with the current directory set to the plugin installation directory rather than the user's actual current directory. See this [Nushell issue](https://github.com/nushell/nushell/issues/12660).
+The output appears in files named after the plugin, in the user's home directory.
 
 Then:
 ```

@@ -13,3 +13,4 @@ readme = "README.md"
 tokio = { version = "1.37.0", features = ["full"] }
 anyhow = "1.0.82"
 nu-path = "0.92.2"
+home = "0.5.9"
