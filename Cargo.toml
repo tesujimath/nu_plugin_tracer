@@ -1,6 +1,6 @@
 [package]
 name = "nu_plugin_tracer"
-version = "0.1.1"
+version = "0.2.1"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "A wrapper to trace Nu plugins"
