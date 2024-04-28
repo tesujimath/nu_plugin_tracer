@@ -6,8 +6,6 @@ This is probably only useful for people writing plugins in languages other than 
 
 Requires the new plugin API of Nu >= 0.93
 
-The new `local-socket` feature is not currently supported, so plugins must be built with `nu-plugin` dependency with `default-features = false`.
-
 ## Usage
 
 Add the plugin using the tracer as a shell interpreter, using the full paths of the plugin tracer and the actual plugin.

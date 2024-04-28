@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Context, Result};
 use home::home_dir;
 use std::{
-    env::{args_os, ArgsOs},
+    env::args_os,
     ffi::{OsStr, OsString},
     path::{Path, PathBuf},
     pin::Pin,
@@ -15,7 +15,7 @@ use tokio::{
     process::Command,
 };
 
-fn get_plugin_from_args() -> Result<(OsString, PathBuf, ArgsOs)> {
+fn get_plugin_from_args() -> Result<(OsString, PathBuf, Vec<OsString>)> {
     let mut args = args_os();
     let path: PathBuf = args.nth(1).ok_or(anyhow!("missing plugin path"))?.into();
 
@@ -24,7 +24,7 @@ fn get_plugin_from_args() -> Result<(OsString, PathBuf, ArgsOs)> {
         .ok_or(anyhow!("failed to determine file name for plugin"))?
         .to_os_string();
 
-    Ok((name, path, args))
+    Ok((name, path, args.collect()))
 }
 
 async fn forward<R, W, Tee>(
@@ -74,6 +74,11 @@ where
 async fn trace_plugin() -> anyhow::Result<()> {
     let home = home_dir().ok_or(anyhow!("can't determine user home directory"))?;
     let (plugin_name, plugin_path, plugin_args) = get_plugin_from_args()?;
+
+    // Refuse --local-socket communication silently, so that nushell falls back to --stdio
+    if plugin_args[0] == "--local-socket" {
+        std::process::exit(1);
+    }
 
     let stdin = stdin();
     let stdout = stdout();
