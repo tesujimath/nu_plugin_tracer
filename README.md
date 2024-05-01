@@ -1,4 +1,4 @@
-# nu_plugin_tracer
+# trace_nu_plugin
 
 This is a diagnostic wrapper for [Nu plugins](https://www.nushell.sh/book/plugins.html) which dumps the raw plugin stdin and stdout into files in the user's home directory.
 
@@ -11,7 +11,7 @@ Requires the new plugin API of Nu >= 0.93
 Add the plugin using the tracer as a shell interpreter, using the full paths of the plugin tracer and the actual plugin.
 
 ```
-> plugin add -s ~/vc/sjg/dev.rust/nu_plugin_tracer/target/debug/nu_plugin_tracer ~/vc/tesujimath/nu_plugin_bash_env/nu_plugin_bash_env
+> plugin add -s ~/vc/sjg/dev.rust/trace_nu_plugin/target/debug/trace_nu_plugin ~/vc/tesujimath/nu_plugin_bash_env/nu_plugin_bash_env
 > plugin use bash_env
 ```
 

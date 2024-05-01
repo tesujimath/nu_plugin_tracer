@@ -1,11 +1,11 @@
 [package]
-name = "nu_plugin_tracer"
+name = "trace_nu_plugin"
 version = "0.2.1"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "A wrapper to trace Nu plugins"
-homepage = "https://github.com/tesujimath/nu_plugin_tracer"
-repository = "https://github.com/tesujimath/nu_plugin_tracer"
+homepage = "https://github.com/tesujimath/trace_nu_plugin"
+repository = "https://github.com/tesujimath/trace_nu_plugin"
 readme = "README.md"
 
 [dependencies]
