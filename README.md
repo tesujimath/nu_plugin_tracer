@@ -17,7 +17,7 @@ Add the plugin using the tracer as a shell interpreter, using the full paths of 
 
 The output appears in files named after the plugin, in the user's home directory.
 
-**WARNING: trace output will accumulate for as long as the plugin is installed with the trace wrapper.  Large files are possible.  Be sure to remove the plugin when finished tracing, and reinstall without the trace wrapper.**
+**WARNING: trace output will accumulate for as long as the plugin is installed with the trace wrapper.  Large files are possible.  Be sure to remove the plugin with `plugin rm` when finished tracing, and reinstall without the trace wrapper.**
 
 Then:
 ```
